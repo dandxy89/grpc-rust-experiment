@@ -1,46 +1,112 @@
-use tonic::{transport::Server, Request, Response, Status};
+use std::pin::Pin;
 
-use bookstore::bookstore_server::{Bookstore, BookstoreServer};
-use bookstore::{GetBookRequest, GetBookResponse};
-
-mod bookstore {
-    include!("bookstore.rs");
-
-    pub(crate) const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("bookstore_descriptor");
-}
+use grpc_rust_experiment::solar_system_info;
+use grpc_rust_experiment::solar_system_info::solar_system_server::SolarSystemServer;
+use grpc_rust_experiment::solar_system_info::{
+    solar_system_server::SolarSystem, Planet, PlanetRequest, PlanetResponse, PlanetsListResponse,
+};
+use tokio::sync::mpsc;
+use tokio_stream::Stream;
+use tokio_stream::StreamExt;
+use tonic::transport::Server;
+use tonic::{Request, Response, Status};
 
 #[derive(Default)]
-pub struct BookStoreImpl {}
+struct SolarSystemInfoService {}
 
 #[tonic::async_trait]
-impl Bookstore for BookStoreImpl {
-    async fn get_book(&self, request: Request<GetBookRequest>) -> Result<Response<GetBookResponse>, Status> {
-        println!("Request from {:?}", request.remote_addr());
+impl SolarSystem for SolarSystemInfoService {
+    type GetPlanetsStream =
+        Pin<Box<dyn Stream<Item = Result<PlanetResponse, Status>> + Send + Sync + 'static>>;
 
-        let response = GetBookResponse {
-            id: request.into_inner().id,
-            author: "Peter".to_owned(),
-            name: "Zero to One".to_owned(),
-            year: 2014,
+    async fn get_planets_list(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<PlanetsListResponse>, Status> {
+        println!("Got a request {:?}", request);
+        let dummy_data = (1..=100)
+            .into_iter()
+            .map(|seq_id| format!("{}", seq_id))
+            .collect();
+        let reply = PlanetsListResponse { list: dummy_data };
+        Ok(Response::new(reply))
+    }
+
+    async fn get_planets(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<Self::GetPlanetsStream>, Status> {
+        println!("Got a request {:?}", request);
+        let (tx, rx) = mpsc::channel(4);
+        let planets: Vec<Planet> = (1..=1000)
+            .into_iter()
+            .map(|seq_id| Planet {
+                id: 1,
+                name: format!("DemoPlanet{seq_id}"),
+                r#type: 1,
+                mean_radius: 31.1,
+                mass: 99.1,
+                satellites: vec![],
+                image: vec![],
+            })
+            .collect();
+
+        tokio::spawn(async move {
+            let mut stream = tokio_stream::iter(&planets);
+
+            while let Some(planet) = stream.next().await {
+                tx.send(Ok(PlanetResponse {
+                    planet: Some(planet.clone()),
+                }))
+                .await
+                .unwrap();
+            }
+        });
+
+        Ok(Response::new(Box::pin(
+            tokio_stream::wrappers::ReceiverStream::new(rx),
+        )))
+    }
+
+    async fn get_planet(
+        &self,
+        request: Request<PlanetRequest>,
+    ) -> Result<Response<PlanetResponse>, Status> {
+        println!("Got a request {:?}", request);
+        let planet = Planet {
+            id: 1,
+            name: request.into_inner().name,
+            r#type: 1,
+            mean_radius: 31.1,
+            mass: 99.1,
+            satellites: vec![],
+            image: vec![],
         };
-        Ok(Response::new(response))
+
+        let reply = PlanetResponse {
+            planet: Some(planet),
+        };
+
+        Ok(Response::new(reply))
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse().unwrap();
-    let bookstore = BookStoreImpl::default();
-    println!("Bookstore server listening on {}", addr);
+    println!("Starting Solar System info server");
 
-    let reflection_service = tonic_reflection::server::Builder::configure()
-        .register_encoded_file_descriptor_set(bookstore::FILE_DESCRIPTOR_SET)
+    let solar_system_info = SolarSystemInfoService::default();
+    let solar_system_svc = SolarSystemServer::new(solar_system_info);
+
+    let reflection_svc = tonic_reflection::server::Builder::configure()
+        .register_encoded_file_descriptor_set(solar_system_info::FILE_DESCRIPTOR_SET)
         .build()
         .unwrap();
 
+    let addr = "[::1]:50051".parse().unwrap();
     Server::builder()
-        .add_service(BookstoreServer::new(bookstore))
-        .add_service(reflection_service)
+        .add_service(solar_system_svc)
+        .add_service(reflection_svc)
         .serve(addr)
         .await?;
 

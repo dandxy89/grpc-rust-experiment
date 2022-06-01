@@ -9,7 +9,9 @@ authors = ["Dan Dixey <dan.dixey@gmail.com>"]
 tonic = "0.7.2"
 tonic-reflection = "0.4.0"
 tokio = { version = "1.18.2", features = ["macros", "rt-multi-thread"] }
+tokio-stream = "0.1.8"
 prost = "0.10.4"
+prost-types = "0.10.1"
 
 [build-dependencies]
 tonic-build = "0.7.2"

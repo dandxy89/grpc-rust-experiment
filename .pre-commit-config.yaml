@@ -26,7 +26,7 @@ repos:
     rev: v1.0
     hooks:
       - id: fmt
-      - id: clippy
+      # - id: clippy
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.2.0
     hooks:

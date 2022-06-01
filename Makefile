@@ -21,8 +21,11 @@ update_pre_commit:  ## Run `pre-commit` auto update
 run_pre_commit:  ## Run `pre-commit` on the project files
 	@$(POETRY) run pre-commit run --all-files
 
-ping_server:
-	grpc_cli call localhost:50051 bookstore.Bookstore.GetBook "id: 'test-book-id'"
+get_planets_list:
+	grpc_cli call localhost:50051 solar_system.SolarSystem.GetPlanetsList ""
+
+get_planets:
+	grpc_cli call localhost:50051 solar_system.SolarSystem.GetPlanet ""
 
 run_server:
 	cargo run --bin server --release
