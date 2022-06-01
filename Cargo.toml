@@ -1,0 +1,23 @@
+[package]
+name = "grpc_rust_experiment"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.61"
+authors = ["Dan Dixey <dan.dixey@gmail.com>"]
+
+[dependencies]
+tonic = "0.7.2"
+tonic-reflection = "0.4.0"
+tokio = { version = "1.18.2", features = ["macros", "rt-multi-thread"] }
+prost = "0.10.4"
+
+[build-dependencies]
+tonic-build = "0.7.2"
+
+[[bin]]
+name = "server"
+path = "src/server.rs"
+
+[[bin]]
+name = "client"
+path = "src/client.rs"
